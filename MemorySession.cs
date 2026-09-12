@@ -32,11 +32,11 @@ internal sealed partial class MemorySession : IDisposable
 
     public MemorySession(Process process)
     {
-        var module = process.MainModule ?? throw new InvalidOperationException("无法读取游戏模块");
+        var module = process.MainModule ?? throw new InvalidOperationException(L.T("无法读取游戏模块", "Could not read the game module."));
         using (var file = File.OpenRead(module.FileName))
         {
             if (Convert.ToHexString(SHA256.HashData(file)) != SupportedHash)
-                throw new InvalidOperationException("游戏版本与地址配置不匹配，请更新修改器。");
+                throw new InvalidOperationException(L.T("游戏版本与地址配置不匹配，请更新修改器。", "Unsupported game build. Please update the helper."));
         }
         moduleBase = module.BaseAddress.ToInt64();
         moduleSize = module.ModuleMemorySize;
@@ -46,7 +46,7 @@ internal sealed partial class MemorySession : IDisposable
         {
             var error = new Win32Exception(Marshal.GetLastWin32Error());
             handle.Dispose();
-            throw new InvalidOperationException("无法打开游戏进程：" + error.Message);
+            throw new InvalidOperationException(L.T("无法打开游戏进程：", "Could not open the game process: ") + L.Error(error));
         }
         try { VerifySignature(false); }
         catch { handle.Dispose(); throw; }
@@ -92,7 +92,7 @@ internal sealed partial class MemorySession : IDisposable
         CheckRange(rva, count);
         byte[] data = new byte[count];
         if (!ReadProcessMemory(handle, (IntPtr)(moduleBase + rva), data, (nuint)count, out nuint read) || read != (nuint)count)
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "读取游戏内存失败");
+            throw new Win32Exception(Marshal.GetLastWin32Error(), L.T("读取游戏内存失败", "Could not read game memory."));
         return data;
     }
 
@@ -100,7 +100,7 @@ internal sealed partial class MemorySession : IDisposable
     {
         CheckRange(rva, data.Length);
         if (!WriteProcessMemory(handle, (IntPtr)(moduleBase + rva), data, (nuint)data.Length, out nuint written) || written != (nuint)data.Length)
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "写入游戏内存失败");
+            throw new Win32Exception(Marshal.GetLastWin32Error(), L.T("写入游戏内存失败", "Could not write game memory."));
     }
 
     private void CheckRange(int rva, int count)
@@ -120,7 +120,7 @@ internal sealed partial class MemorySession : IDisposable
         var expected = (byte[])patch.Original.Clone();
         if (patched) expected[patch.Rva - patch.SignatureRva] = patch.Replacement;
         if (!Read(patch.SignatureRva, expected.Length).SequenceEqual(expected))
-            throw new InvalidOperationException("碰撞指令与预期不符，可能存在其他修改器或游戏版本变化。");
+            throw new InvalidOperationException(L.T("碰撞指令与预期不符，可能存在其他修改器或游戏版本变化。", "Unexpected collision instructions. Another trainer or a different game build may be present."));
     }
 
     public void SetInvincible(bool enabled)
@@ -158,17 +158,17 @@ internal sealed partial class MemorySession : IDisposable
     {
         var address = (IntPtr)(moduleBase + rva);
         if (!VirtualProtectEx(handle, address, 1, 0x40, out uint oldProtection))
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "无法修改碰撞指令的内存权限");
+            throw new Win32Exception(Marshal.GetLastWin32Error(), L.T("无法修改碰撞指令的内存权限", "Could not change collision-code memory protection."));
         try
         {
             Write(rva, [value]);
             if (!FlushInstructionCache(handle, address, 1))
-                throw new Win32Exception(Marshal.GetLastWin32Error(), "刷新指令缓存失败");
+                throw new Win32Exception(Marshal.GetLastWin32Error(), L.T("刷新指令缓存失败", "Could not flush the instruction cache."));
         }
         finally
         {
             if (!VirtualProtectEx(handle, address, 1, oldProtection, out _))
-                throw new Win32Exception(Marshal.GetLastWin32Error(), "恢复碰撞指令内存权限失败");
+                throw new Win32Exception(Marshal.GetLastWin32Error(), L.T("恢复碰撞指令内存权限失败", "Could not restore collision-code memory protection."));
         }
     }
 
@@ -192,7 +192,7 @@ internal sealed partial class MemorySession : IDisposable
             }
             catch (Exception ex) { errors.Add(ex); }
         }
-        if (errors.Count > 0) throw new AggregateException("恢复中弹判定失败", errors);
+        if (errors.Count > 0) throw new AggregateException(L.T("恢复中弹判定失败", "Could not restore collision detection."), errors);
     }
 
     public void Dispose()
@@ -203,7 +203,7 @@ internal sealed partial class MemorySession : IDisposable
         try { RestoreInvincible(); } catch (Exception ex) { errors.Add(ex); }
         // A process may exit between any two native calls. There is nothing to restore
         // after its handle is signaled; never turn that race into an unclosable UI.
-        if (errors.Count > 0 && IsAlive) throw new AggregateException("恢复游戏状态失败", errors);
+        if (errors.Count > 0 && IsAlive) throw new AggregateException(L.T("恢复游戏状态失败", "Could not restore the game state."), errors);
         modeBlock = 0; modePatches.Clear(); owned.Clear();
         handle.Dispose();
         disposed = true;

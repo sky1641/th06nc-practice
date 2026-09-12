@@ -8,10 +8,15 @@
     <PlatformTarget>x64</PlatformTarget>
     <AssemblyName>TH06NCTrainer</AssemblyName>
     <RootNamespace>TH06NCTrainer</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
+    <PracticeLanguage Condition="'$(PracticeLanguage)' == ''">en</PracticeLanguage>
+    <DefineConstants Condition="'$(PracticeLanguage)' == 'en'">$(DefineConstants);ENGLISH</DefineConstants>
     <ApplicationIcon Condition="Exists('icons/practice.ico')">icons/practice.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="assets/background.png" Condition="Exists('assets/background.png') And '$(IncludeLocalBackground)' != 'false'" />
   </ItemGroup>
+  <Target Name="ValidatePracticeLanguage" BeforeTargets="BeforeBuild">
+    <Error Condition="'$(PracticeLanguage)' != 'en' And '$(PracticeLanguage)' != 'zh-CN'" Text="PracticeLanguage must be en or zh-CN." />
+  </Target>
 </Project>

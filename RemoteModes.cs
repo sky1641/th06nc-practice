@@ -74,7 +74,7 @@ internal sealed partial class MemorySession
     }
     private void RequireGame()
     {
-        if (!InGame) throw new InvalidOperationException("请先进入一局，再启用此功能。");
+        if (!InGame) throw new InvalidOperationException(L.T("请先进入一局，再启用此功能。", "Start a run before enabling this feature."));
     }
     public void HeartbeatModes()
     {
@@ -89,7 +89,7 @@ internal sealed partial class MemorySession
     {
         foreach (var (site, patch) in modePatches)
             if (!Read(site.Rva, patch.Length).SequenceEqual(patch))
-                throw new InvalidOperationException("玩法指令被其他程序改变，请关闭游戏后重新启动。");
+                throw new InvalidOperationException(L.T("玩法指令被其他程序改变，请关闭游戏后重新启动。", "Another program changed the mode instructions. Close and restart the game."));
     }
 
     internal void InstallModes()
@@ -97,7 +97,7 @@ internal sealed partial class MemorySession
         if (ModesInstalled) { VerifyModes(); return; }
         foreach (var site in ModeCode.Sites)
             if (!Read(site.Rva, site.Original.Length).SequenceEqual(site.Original))
-                throw new InvalidOperationException($"指令校验失败（{site.Rva:X}），未启用功能。");
+                throw new InvalidOperationException(L.T($"指令校验失败（{site.Rva:X}），未启用功能。", $"Instruction check failed ({site.Rva:X}); feature not enabled."));
         // Allocate close enough for rel32 jumps and RIP-relative accesses.
         long first = (moduleBase + moduleSize + 0xFFFF) & ~0xFFFFL;
         for (long address = first; address < moduleBase + 0x60000000; address += 0x10000)
@@ -105,7 +105,7 @@ internal sealed partial class MemorySession
             var allocated = VirtualAllocEx(handle, (IntPtr)address, ModeCode.AllocationSize, 0x3000, 0x04);
             if (allocated != IntPtr.Zero) { modeBlock = allocated.ToInt64(); break; }
         }
-        if (!ModesInstalled) throw new InvalidOperationException("无法分配玩法模块内存，没有修改游戏指令。");
+        if (!ModesInstalled) throw new InvalidOperationException(L.T("无法分配玩法模块内存，没有修改游戏指令。", "Could not allocate mode memory. Game instructions were not changed."));
         try
         {
             WriteRemote(Control + ModeCode.PlayerOpacity, BitConverter.GetBytes(100));
@@ -115,7 +115,7 @@ internal sealed partial class MemorySession
                 var site = ModeCode.Sites[index];
                 long stub = modeBlock + index * 0x400;
                 byte[] code = ModeCode.Build(site, stub, moduleBase, Control);
-                if (code.Length > 0x400) throw new InvalidOperationException("Native hook exceeds reserved slot");
+                if (code.Length > 0x400) throw new InvalidOperationException(L.T("原生补丁超出预留空间。", "Native hook exceeds reserved slot."));
                 WriteRemote(stub, code);
             }
             if (!VirtualProtectEx(handle, (IntPtr)modeBlock, 0x8000, 0x20, out _))
@@ -128,7 +128,7 @@ internal sealed partial class MemorySession
                 // Recheck after stopping threads, before any code writes.
                 foreach (var site in ModeCode.Sites)
                     if (!Read(site.Rva, site.Original.Length).SequenceEqual(site.Original))
-                        throw new InvalidOperationException("安装前指令发生变化，已取消。");
+                        throw new InvalidOperationException(L.T("安装前指令发生变化，已取消。", "Instructions changed before installation. Cancelled."));
                 for (int index = 0; index < ModeCode.Sites.Length; index++)
                 {
                     var site = ModeCode.Sites[index];
@@ -173,20 +173,20 @@ internal sealed partial class MemorySession
     private void FreeModeBlock()
     {
         if (modeBlock != 0 && !VirtualFreeEx(handle, (IntPtr)modeBlock, 0, 0x8000))
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "无法释放玩法模块内存");
+            throw new Win32Exception(Marshal.GetLastWin32Error(), L.T("无法释放玩法模块内存", "Could not free mode memory."));
         modeBlock = 0;
     }
     private byte[] ReadRemote(long address, int count)
     {
         byte[] data = new byte[count];
         if (!ReadProcessMemory(handle, (IntPtr)address, data, (nuint)count, out nuint read) || read != (nuint)count)
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "读取玩法状态失败");
+            throw new Win32Exception(Marshal.GetLastWin32Error(), L.T("读取玩法状态失败", "Could not read mode state."));
         return data;
     }
     private void WriteRemote(long address, byte[] bytes)
     {
         if (!WriteProcessMemory(handle, (IntPtr)address, bytes, (nuint)bytes.Length, out nuint written) || written != (nuint)bytes.Length)
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "写入玩法状态失败");
+            throw new Win32Exception(Marshal.GetLastWin32Error(), L.T("写入玩法状态失败", "Could not write mode state."));
     }
     private void WriteCode(int rva, byte[] bytes)
     {
@@ -240,7 +240,7 @@ internal sealed partial class MemorySession
             new ThreadGuard(suspended).Dispose();
             Thread.Sleep(2);
         }
-        throw new InvalidOperationException("游戏正在执行玩法代码，请稍后重试或先退出游戏。");
+        throw new InvalidOperationException(L.T("游戏正在执行玩法代码，请稍后重试或先退出游戏。", "The game is executing mode code. Try again later or close the game first."));
     }
     private sealed class ThreadGuard(List<SafeWaitHandle> threads) : IDisposable
     {

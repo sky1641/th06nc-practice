@@ -11,6 +11,7 @@ internal static class UiPaintSelfTest
         try
         {
             WindowFrameSelfTest.Run(report);
+            LocalizationSelfTest.Run(report);
             using (var form = new TrainerForm(false))
             {
                 void VerifyTree(Control parent)
@@ -33,7 +34,7 @@ internal static class UiPaintSelfTest
             foreach (bool button in new[] { false, true })
             {
                 using Control control = button ? new ThemedButton() : new ThemedCheckBox { Checked = check };
-                control.Size = new Size(220, 38); control.Text = "锁 POWER  [F7]";
+                control.Size = new Size(220, 38); control.Text = L.T("锁 POWER  [F7]", "Lock POWER  [F7]");
                 control.Font = new Font("Microsoft YaHei UI", fontSize); control.Enabled = enabled;
                 var bounds = new Rectangle(Point.Empty, control.Size);
                 using var original = Render(control, Point.Empty, bounds);

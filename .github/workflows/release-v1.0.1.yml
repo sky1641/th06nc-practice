@@ -1,0 +1,45 @@
+name: Release v1.0.1 language editions
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [.github/workflows/release-v1.0.1.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-v1.0.1
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - name: Build and validate independent language packages
+        shell: pwsh
+        run: .\build-release.ps1
+      - name: Publish separate language releases
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($language in @('zh-CN', 'en')) {
+            $tag = "v1.0.1-$language"
+            gh release view $tag --repo '${{ github.repository }}' 2>$null
+            if ($LASTEXITCODE -eq 0) { Write-Host "Existing release retained: $tag"; continue }
+            $title = if ($language -eq 'en') { 'Practice Helper v1.0.1 — English' } else { '新典练习辅助 v1.0.1 — 中文版' }
+            $folder = ".\artifacts\v1.0.1\$language"
+            $files = @((Join-Path $folder "TH06NCPractice-v1.0.1-$language-win-x64.zip"), (Join-Path $folder "TH06NCPractice-v1.0.1-$language-win-x64-self-contained.zip"), (Join-Path $folder 'SHA256SUMS.txt'))
+            gh release create $tag @files --repo '${{ github.repository }}' --target '${{ github.sha }}' --title $title --notes-file ".\distribution\$language\RELEASE_NOTES.md" --draft
+            if ($LASTEXITCODE -ne 0) { throw "Upload failed for $tag; draft retained." }
+            $latest = if ($language -eq 'en') { '--latest' } else { '--latest=false' }
+            gh release edit $tag --repo '${{ github.repository }}' --draft=false $latest
+            if ($LASTEXITCODE -ne 0) { throw "Publication failed: $tag" }
+          }

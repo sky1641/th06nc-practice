@@ -44,9 +44,3 @@ Close the helper normally to restore its changes. If restoration fails, close th
 Automated UI and isolated-memory tests do not replace full live-game testing. Player types, lasers, continuous stage transitions, focus changes, controllers, display configurations and replays still need broader testing. Include the game build, enabled features and reproduction steps in bug reports. Do not upload game files, saves or credentials.
 
 The red-moon background was supplied by the project owner; inclusion does not claim ownership or grant an additional reuse license. The red P icon is separate original artwork. No reuse license has been selected for the project. The Windows 11 frame is themed; earlier Windows versions retain their standard frame.
-
-## Development
-
-The default source build is English. Select Chinese with `-p:PracticeLanguage=zh-CN`; select English with `-p:PracticeLanguage=en`. Run `build-release.ps1` to create separate standard and self-contained packages for both languages. Each ZIP contains only its own user documentation. The two editions share the same gameplay implementation and single-instance guard.
-
-[Chinese documentation](README.zh-CN.md) · [Release notes](distribution/en/RELEASE_NOTES.md)
