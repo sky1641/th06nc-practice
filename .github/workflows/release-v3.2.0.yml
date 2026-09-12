@@ -1,0 +1,80 @@
+name: Release v3.2.0
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/release-v3.2.0.yml
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Check for an existing release
+        id: existing
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release view v3.2.0 --repo "${{ github.repository }}"
+
+      - name: Check out source
+        if: steps.existing.outcome == 'failure'
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 9
+        if: steps.existing.outcome == 'failure'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Build release packages
+        if: steps.existing.outcome == 'failure'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $project = '.\TH06NCTrainer.csproj'
+          $portable = '.\artifacts\portable'
+          $standalone = '.\artifacts\self-contained'
+
+          dotnet publish $project -c Release -r win-x64 --self-contained false -p:DebugType=None -p:DebugSymbols=false -o $portable
+          if ($LASTEXITCODE -ne 0) { throw 'Framework-dependent build failed.' }
+
+          dotnet publish $project -c Release -r win-x64 --self-contained true -p:DebugType=None -p:DebugSymbols=false -o $standalone
+          if ($LASTEXITCODE -ne 0) { throw 'Self-contained build failed.' }
+
+          foreach ($folder in @($portable, $standalone)) {
+            Copy-Item '.\README.md' $folder
+            Copy-Item '.\README.zh-CN.md' $folder
+          }
+
+          Compress-Archive -Path "$portable\*" -DestinationPath '.\artifacts\TH06NCTrainer-v3.2.0-win-x64.zip'
+          Compress-Archive -Path "$standalone\*" -DestinationPath '.\artifacts\TH06NCTrainer-v3.2.0-win-x64-self-contained.zip'
+
+          Get-FileHash '.\artifacts\TH06NCTrainer-v3.2.0-win-x64.zip', '.\artifacts\TH06NCTrainer-v3.2.0-win-x64-self-contained.zip' -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower()) *$(Split-Path $_.Path -Leaf)" } |
+            Set-Content '.\artifacts\SHA256SUMS.txt' -Encoding ascii
+
+      - name: Publish private GitHub release
+        if: steps.existing.outcome == 'failure'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $releaseArgs = @(
+            'release', 'create', 'v3.2.0',
+            '.\artifacts\TH06NCTrainer-v3.2.0-win-x64.zip',
+            '.\artifacts\TH06NCTrainer-v3.2.0-win-x64-self-contained.zip',
+            '.\artifacts\SHA256SUMS.txt',
+            '--repo', '${{ github.repository }}',
+            '--target', '${{ github.sha }}',
+            '--title', 'TH06 New Classic Practice Helper v3.2.0',
+            '--notes', 'Initial private test release. The standard win-x64 package requires .NET 9 Desktop Runtime x64; the self-contained package does not. The application UI is currently in Simplified Chinese. Live-game regression testing is still incomplete; read the included documentation before use.'
+          )
+          & gh @releaseArgs
+
