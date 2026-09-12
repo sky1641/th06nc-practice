@@ -1,8 +1,10 @@
-param([string]$OutputRoot = (Join-Path $PSScriptRoot 'artifacts\v1.0.1'))
+param([string]$OutputRoot)
 
 $ErrorActionPreference = 'Stop'
-$project = Join-Path $PSScriptRoot 'TH06NCTrainer.csproj'
-if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'assets\background.png'))) { throw 'Release background is missing.' }
+$repoRoot = Split-Path -Parent $PSScriptRoot
+if (-not $OutputRoot) { $OutputRoot = Join-Path $repoRoot 'artifacts\v1.0.1' }
+$project = Join-Path $repoRoot 'src\TH06NCTrainer.csproj'
+if (-not (Test-Path -LiteralPath (Join-Path $repoRoot 'assets\background.png'))) { throw 'Release background is missing.' }
 $OutputRoot = [IO.Path]::GetFullPath($OutputRoot)
 foreach ($language in @('en', 'zh-CN')) {
     $languageRoot = Join-Path $OutputRoot $language
@@ -20,7 +22,7 @@ foreach ($language in @('en', 'zh-CN')) {
         $test = Start-Process $exe -ArgumentList @('--ui-self-test', ('"' + $report + '"')) -PassThru -Wait -WindowStyle Hidden
         if ($test.ExitCode -ne 0) { Get-Content -LiteralPath $report; throw "UI regression failed: $language$suffix" }
         if (-not (Select-String -LiteralPath $report -SimpleMatch "PASS: $language standalone language")) { throw 'Wrong package language.' }
-        $docs = Join-Path $PSScriptRoot "distribution\$language"
+        $docs = Join-Path $repoRoot "docs\$language"
         Copy-Item -LiteralPath (Join-Path $docs 'README.md'), (Join-Path $docs 'RELEASE_NOTES.md') -Destination $folder
         $archive = Join-Path $languageRoot "TH06NCPractice-v1.0.1-$language-win-x64$suffix.zip"
         if (Test-Path -LiteralPath $archive) { throw "Existing archive retained: $archive" }

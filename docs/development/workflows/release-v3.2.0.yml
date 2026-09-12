@@ -77,4 +77,3 @@ jobs:
             '--notes', 'Initial private test release. The standard win-x64 package requires .NET 9 Desktop Runtime x64; the self-contained package does not. The application UI is currently in Simplified Chinese. Live-game regression testing is still incomplete; read the included documentation before use.'
           )
           & gh @releaseArgs
-

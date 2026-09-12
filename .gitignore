@@ -12,6 +12,7 @@ settings.json
 assets/*
 !assets/background.png
 !assets/README.md
+!assets/practice.ico
 .env
 .env.*
 *.log

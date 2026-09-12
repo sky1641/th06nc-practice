@@ -11,10 +11,11 @@
     <Version>1.0.1</Version>
     <PracticeLanguage Condition="'$(PracticeLanguage)' == ''">en</PracticeLanguage>
     <DefineConstants Condition="'$(PracticeLanguage)' == 'en'">$(DefineConstants);ENGLISH</DefineConstants>
-    <ApplicationIcon Condition="Exists('icons/practice.ico')">icons/practice.ico</ApplicationIcon>
+    <ApplicationIcon Condition="Exists('../assets/practice.ico')">../assets/practice.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
-    <EmbeddedResource Include="assets/background.png" Condition="Exists('assets/background.png') And '$(IncludeLocalBackground)' != 'false'" />
+    <EmbeddedResource Include="../assets/background.png" LogicalName="TH06NCTrainer.assets.background.png" Condition="Exists('../assets/background.png') And '$(IncludeLocalBackground)' != 'false'" />
+    <Compile Include="../tests/**/*.cs" Link="Tests/%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
   <Target Name="ValidatePracticeLanguage" BeforeTargets="BeforeBuild">
     <Error Condition="'$(PracticeLanguage)' != 'en' And '$(PracticeLanguage)' != 'zh-CN'" Text="PracticeLanguage must be en or zh-CN." />

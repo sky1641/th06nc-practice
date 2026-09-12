@@ -44,3 +44,5 @@ Close the helper normally to restore its changes. If restoration fails, close th
 Automated UI and isolated-memory tests do not replace full live-game testing. Player types, lasers, continuous stage transitions, focus changes, controllers, display configurations and replays still need broader testing. Include the game build, enabled features and reproduction steps in bug reports. Do not upload game files, saves or credentials.
 
 The red-moon background was supplied by the project owner; inclusion does not claim ownership or grant an additional reuse license. The red P icon is separate original artwork. No reuse license has been selected for the project. The Windows 11 frame is themed; earlier Windows versions retain their standard frame.
+
+[Chinese documentation](../zh-CN/README.md) · [Release notes](RELEASE_NOTES.md)
