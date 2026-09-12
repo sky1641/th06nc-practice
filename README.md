@@ -1,108 +1,115 @@
-# 东方红魔乡：新典练习辅助 v3.2
+# TH06 New Classic Practice Helper v3.2
 
-Windows x64 单机练习辅助。默认不启用任何锁定或玩法开关；目标是方便重复练习，不替代正常通关挑战。
+English | [简体中文](README.zh-CN.md)
 
-个人实验项目，使用 AI 辅助实现，功能由项目所有者提出并进行使用反馈。不是游戏官方工具，也不隶属于 thprac；目前不承诺完整兼容性或固定维护周期。
+An experimental single-player practice helper for **TH06 New Classic**, running on Windows x64. All resource locks and gameplay modes are disabled by default. It is intended for practice and exploration, not as a replacement for an unassisted clear.
 
-仓库只包含工具源码和说明，不包含游戏本体、素材或个人配置。当前版本为 v3.2.0，仍需进一步实机测试。暂未设置开源许可证；是否公开及如何授权另行决定。
+This is a personal project developed with AI assistance, with features and usage feedback provided by the project owner. It is not an official game tool and is not affiliated with thprac. Full compatibility and a regular maintenance schedule are not promised.
 
-## 从源码构建
+The repository contains tool source code and documentation only: no game executable, assets, or personal settings. Version **3.2.0** still needs further live-game testing. No open-source license has been selected; public release and licensing remain separate decisions. **The application UI is currently in Simplified Chinese.**
 
-在 Windows x64 上安装 .NET 9 SDK，然后在仓库目录运行：
+## Build
+
+Install the .NET 9 SDK on Windows x64, then run this from the repository directory:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
-生成的程序位于 `artifacts/app/TH06NCTrainer.exe`。运行时需要 .NET 9 Desktop Runtime x64，请保留输出目录内全部文件，不要只复制 EXE。构建不需要游戏文件，也不会自动连接或修改游戏。
+The output is `artifacts/app/TH06NCTrainer.exe`. Running it requires the **.NET 9 Desktop Runtime x64**. Keep all output files together; do not copy only the EXE. Building does not require game files and does not connect to or modify the game.
 
-如不使用脚本，也可执行 `dotnet build .\TH06NCTrainer.csproj -c Release`。源文件中的挂钩只针对下文标明的游戏版本；不能通过盲改地址适配其他版本。
-
-## 使用
-
-1. 构建后正常关闭旧版修改器，再运行输出目录中的 TH06NCTrainer.exe。不要同时运行 CE 或其他修改同一指令的工具。
-2. 启动 Steam 中的新典，进入一局。显示版本校验通过后，按需启用。
-3. 资源可以“设置一次”，不必持续锁定。POWER 范围 0–128，残机及 Bomb 范围 0–8。
-
-| 按键 | 功能 |
-| --- | --- |
-| F5 / F6 / F7 | 锁残机 / 锁 Bomb / 锁 POWER |
-| F8 | 无敌：普通弹、敌机接触和激光不触发中弹 |
-| F9 | 和平观光：禁敌弹／激光、清除已有敌弹、接触保护、过滤敌弹发射音效 |
-| F10 | 选择／关闭可攻击咲夜模式 |
-| F11 | 选择／关闭不可攻击咲夜模式 |
-| 游戏放雷键 | 咲夜模式开启时，按一次时停，再按一次恢复；不消耗 Bomb，0 Bomb 也可使用 |
-| F12 | 不注册、不拦截，留给 Steam 截图 |
-
-“放雷键”指游戏输入设置中的 Bomb 动作，通常为 X，不是字母 B。手柄映射到该动作也应走相同逻辑，但尚未实机验证。
-
-## 基础变速（v3.2 新增）
-
-进入游戏后，在“游戏速度”填写 25–200（百分比）并点击“应用”，或直接选 0.5×、0.75×、恢复 1×、1.5×、2×。默认 1×，不保存到下次启动。
-
-- 修改原生整帧等待间隔，自机、敌机、弹幕和游戏内计时一起改变节奏，不仅是移动速度。
-- 音乐不主动拉伸或变调，可能不再与关卡进度对齐。加速受电脑性能、渲染等待和垂直同步限制，目标 2× 不代表所有环境都能达到。
-- 跨面和重试保留所选倍率；标题／加载期间暂用原速，进入游戏后重新应用。
-- “恢复 1×”只恢复速度，不关闭和平、时停或资源锁定。咲夜时停可以与倍率并用。
-- 已移除“全部关闭”按钮及对应快捷键。正常退出、重新连接或错误清理仍会恢复各项内存修改；不是取消退出恢复。
-- 速度心跳失联约 120 个渲染帧后恢复原速；慢速下所需墙钟时间更长，不是立即恢复。进程关闭则全部内存修改自然消失。
-- 不增加分数上限、不清零得分、不阻止结算，也不保证游戏不会记录成绩或成就。辅助成绩与正常挑战成绩应区分；目前未实现独立成绩存储。
-
-本版仍为自用实验工具。倍率已在隔离映像的原生帧调度代码和独立测试进程验证，实际关卡、暂停／切后台、显示设置、原生快进、音画表现仍待实机回归。
-
-## 两种时停
-
-两个选项互斥，可在时停中切换。F10/F11 选择模式，不直接触发时停。
-
-- 可攻击：自机可移动、射击并结算原有伤害，敌机移动和弹幕脚本停止，敌弹、道具等更新冻结。不是伤害倍率修改。
-- 不可攻击：自机可移动，自机射击及敌机更新也暂停。
-- 跨面／重试加载时保留和平观光和已选咲夜模式，但解除当前时停，下一面仍可直接使用放雷键。
-- 对话、自机重生／中弹、已有原生 Bomb、Boss 血量跨阶段阈值或归零时解除本次时停，保留就绪模式。回标题等非游戏场景关闭这两个新模式。
-- 关闭咲夜模式后恢复游戏原生放雷。游戏中敌方咲夜的原生时停标记不会被改写。
-
-## 和平模式为什么原先有声音
-
-游戏脚本播放发弹音效与生成子弹是分开的。v3 只拦截生成和清除对象，播放请求仍然存在。
-v3.1 在音效队列播放前过滤已确认的敌弹／激光音效，并压紧队列，避免队首空位导致其他声音丢失。不改总音量，不关 BGM。普通自机射击、拾取、菜单等音效保留。
-过滤按音效 ID 进行；若特殊演出复用相同音效，也可能被一并过滤。音乐、敌机死亡和爆炸等声音仍可能正常响起，这不等于和平模式失效。
-
-## 安全与局限
-
-- 只修改运行内存，不写游戏 EXE、不改存档文件。游戏本身仍可能记录本局成绩或解锁；当前没有成绩隔离，不保证 Steam 成就不受影响。
-- 不要用辅助成绩与正常通关比较。修改期间的录像可能失同步；当前没有录像元数据记录或兼容性保证。
-- 正常退出恢复原始指令。异常恢复失败时先关闭游戏再退出练习器。意外失联有约 120 个自机更新帧的模式超时保护，不是精确墙钟计时；它不替代正常退出，也不覆盖旧版无敌补丁。
-- 版本不匹配会拒绝连接。只支持下面 SHA-256 对应的 th06nc.exe：
-  `07850C8C6E469C0E82C13423E6D0D096A88D693455BDACACBB44C0AA3BCCE473`
-- 运行需要 .NET 9 Desktop Runtime x64。公开发布前需重新评估运行时支持与分发方案，并重测。
-
-## 验证与源码
-
-仓库包含自动化自测源码，可通过下方命令生成本地验证报告：在私有映像上执行实际 x64 指令，并在独立、持续更新的测试进程中验证挂钩安装、时停触发与卸载；不向真实游戏注入测试数据。报告不随仓库上传。
-可攻击测试执行实际敌机受击代码，确认 HP 100 → 76，同时位置和计时保持不变。音效测试检查过滤、保留与队列压紧。粒子效果及部分测试出口在私有测试映像中被替换，不属于真实游戏测试。
-
-尚待实机回归：连续过面、所有自机类型／POWER 档位、激光敌弹、Boss 死亡与阶段变化、敌方原生咲夜时停、手柄和录像。
-
-源文件直接位于仓库根目录。安装 .NET 9 SDK 后，在源码目录执行：
+Alternatively:
 
 ```powershell
 dotnet build .\TH06NCTrainer.csproj -c Release
 ```
 
-测试仅针对自己合法安装的游戏文件：
+Hooks support only the exact game build identified below. Changing addresses without validating the underlying code is not a supported way to add compatibility.
+
+## Usage and hotkeys
+
+1. Close any older trainer normally, then launch the newly built helper. Do not run Cheat Engine or other tools that modify the same instructions at the same time.
+2. Launch New Classic through Steam and start a run. Enable features after the helper passes its version check.
+3. Resources can be set once without keeping them locked. POWER accepts 0–128; lives and bombs accept 0–8.
+
+| Key | Action |
+| --- | --- |
+| F5 / F6 / F7 | Toggle lives / bombs / POWER locks |
+| F8 | Invincibility against ordinary bullets, enemy contact, and lasers |
+| F9 | Peaceful sightseeing: suppress enemy bullets and lasers, clear existing enemy projectiles, protect against contact, and filter enemy firing sounds |
+| F10 | Select or disable Sakuya mode with attacks enabled |
+| F11 | Select or disable Sakuya mode with attacks disabled |
+| In-game Bomb action | With Sakuya mode selected, press once to stop time and again to resume; consumes no bombs and works at zero bombs |
+| F12 | Not registered or intercepted; left available for Steam screenshots |
+
+The Bomb action is the game's configured input, usually **X**, not the letter B. Controller mappings should follow the same input path but have not been tested in live gameplay.
+
+## Game speed
+
+In the game-speed section (`游戏速度`), enter 25–200 percent and click Apply (`应用`), or choose 0.5×, 0.75×, 1×, 1.5×, or 2×. The default is 1×; the choice is not saved between launches.
+
+- Adjusts native whole-frame pacing: player, enemies, projectiles, and in-game timers change pace together, not just movement speed.
+- Music is not stretched or pitch-shifted and may drift out of sync with stage progression. Performance, rendering waits, and VSync can limit acceleration; selecting 2× does not guarantee it is reached.
+- The selected speed persists across stages and retries. Title and loading scenes temporarily use normal speed, with the selected rate reapplied during gameplay.
+- Restoring 1× does not disable resource locks, peace mode, or time stop. Speed and Sakuya mode can be used together.
+- There is no "disable all" button or hotkey. Normal exit, reconnection, and error cleanup still restore the memory modifications.
+- If the speed heartbeat expires, normal pacing returns after roughly 120 rendered frames. This takes longer in wall-clock time at slower speeds; it is not immediate. Closing the game discards its process memory.
+- There is no artificial score cap, score reset, or results-screen block. The game may still record scores or achievements. Assisted results should be distinguished from unassisted results; separate score storage is not implemented.
+
+Native pacing has been checked in isolated game images and a separate test process. Live stages, pause/background behavior, display settings, native fast-forward, and audiovisual behavior still need regression testing.
+
+## Sakuya time stop
+
+The two modes are mutually exclusive and can be switched while time is stopped. **F10/F11 select the mode; the in-game Bomb action triggers time stop.**
+
+- **Attacks enabled:** the player can move and shoot, and normal damage is processed. Enemy movement and bullet scripts stop; enemy projectiles, items, and related updates freeze. This does not multiply damage.
+- **Attacks disabled:** the player can move, but player shooting and enemy updates are paused.
+- Stage transitions and retry loading retain peace mode and the selected Sakuya mode, but release the active time stop. The Bomb action remains available in the next stage.
+- Dialogue, player respawn/hit states, an existing native bomb, and boss HP crossing a phase threshold or reaching zero release the active stop while keeping the mode ready. Returning to the title or other non-gameplay scenes disables peace and Sakuya modes.
+- Disabling Sakuya mode restores the native Bomb action. The enemy Sakuya's own native time-stop flag is not overwritten.
+
+## Peace-mode audio
+
+Firing sounds and projectile spawning are separate script actions. Version 3 suppressed spawning and cleared objects without suppressing sound requests.
+
+Since v3.1, confirmed enemy-bullet/laser sound IDs are filtered before playback, and the queue is compacted so empty slots do not suppress unrelated sounds. Master volume and BGM are unchanged; ordinary player shots, item pickup, and menu sounds remain.
+
+Filtering is based on sound IDs, so special effects reusing those IDs may also be muted. Music, enemy deaths, and explosions may still be audible; this does not necessarily mean peace mode failed.
+
+## Safety and limitations
+
+- Only running process memory is modified; the helper does not write the game EXE or save files. The game itself may still save scores or unlocks. Score isolation is absent, and Steam achievements are not guaranteed to remain unaffected.
+- Replays recorded with modifications may desynchronize. Replay metadata and compatibility guarantees are not implemented. Do not present assisted results as unassisted clears.
+- Normal exit restores original instructions. If recovery fails, close the game before exiting the helper. Mode heartbeat protection expires after about 120 player-update frames, not a precise wall-clock interval. It does not replace normal cleanup and does not cover the older invincibility patch.
+- Unsupported game versions are rejected. Only `th06nc.exe` with this SHA-256 is supported:
+
+  `07850C8C6E469C0E82C13423E6D0D096A88D693455BDACACBB44C0AA3BCCE473`
+
+- Runtime support and distribution options must be reassessed and retested before a public release.
+
+## Tests
+
+Automated self-test sources are included. They execute actual x64 instructions in private mapped game images and check hook installation, time-stop activation, and removal in a separate actively updating test process. They do not inject test data into a running game. Generated reports are not uploaded to the repository.
+
+The attack-enabled test executes native enemy-damage code and verifies HP changing from 100 to 76 while position and timers remain unchanged. Audio tests check filtering, preservation, and queue compaction. Particle effects and some test exits are stubbed in private test images; these are not live-game tests.
+
+Still requiring live regression tests: consecutive stages, all player types and POWER levels, laser patterns, boss deaths and phase changes, the enemy Sakuya's native time stop, controllers, and replays.
+
+After building with `dotnet build`, run tests only against your own legally installed game file:
 
 ```powershell
-.\bin\Release\net9.0-windows\TH06NCTrainer.exe --self-test "游戏的完整路径\th06nc.exe" "验证报告的完整路径.txt"
+.\bin\Release\net9.0-windows\TH06NCTrainer.exe --self-test "FULL_PATH_TO_GAME\th06nc.exe" "FULL_PATH_TO_REPORT.txt"
 ```
 
-没有分发游戏本体或资源，没有联网、广告、账号或关注验证功能。当前是本地测试版，不是已经发布的公开项目；公开发布及许可证由项目所有者另行决定。
+## Repository layout
 
-## 项目结构
+- `Program.cs`: window, hotkeys, and personal preferences.
+- `MemorySession.cs`: game connection, version checks, resources, and invincibility.
+- `RemoteModes.cs` / `ModeCode.cs`: peace mode, time stop, remote hooks, and restoration.
+- `SpeedControl.cs`: basic game-speed control.
+- `*SelfTest.cs` / `RemoteModeTest.cs`: isolated-image and separate-process tests.
+- [Implementation notes for v3.2](docs/implementation-v3.2.txt): speed-control rationale and limitations, currently in Chinese.
 
-- `Program.cs`：窗口、快捷键及个人设置。
-- `MemorySession.cs`：游戏连接、版本检查、资源与无敌。
-- `RemoteModes.cs` / `ModeCode.cs`：和平、时停、远程挂钩及恢复逻辑。
-- `SpeedControl.cs`：基础变速控制。
-- `*SelfTest.cs` / `RemoteModeTest.cs`：隔离映像与独立测试进程的验证。
-- `docs/implementation-v3.2.txt`：变速实现依据与局限。
+The helper has no networking, advertising, account requirement, or follow-to-unlock mechanism. No game files or assets are distributed. It remains an experimental project, not a public release.
 
-反馈问题时请描述游戏版本、启用功能及复现步骤。不要上传游戏 EXE、素材、存档、含个人信息的日志或账号凭据。
+When reporting a problem, describe the game version, enabled features, and reproduction steps. Do not upload game executables, assets, saves, logs containing personal information, or account credentials.
