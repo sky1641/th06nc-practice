@@ -68,14 +68,6 @@ The two modes are mutually exclusive and can be switched while time is stopped. 
 - Dialogue, player respawn/hit states, an existing native bomb, and boss HP crossing a phase threshold or reaching zero release the active stop while keeping the mode ready. Returning to the title or other non-gameplay scenes disables peace and Sakuya modes.
 - Disabling Sakuya mode restores the native Bomb action. The enemy Sakuya's own native time-stop flag is not overwritten.
 
-## Peace-mode audio
-
-Firing sounds and projectile spawning are separate script actions. Version 3 suppressed spawning and cleared objects without suppressing sound requests.
-
-Since v3.1, confirmed enemy-bullet/laser sound IDs are filtered before playback, and the queue is compacted so empty slots do not suppress unrelated sounds. Master volume and BGM are unchanged; ordinary player shots, item pickup, and menu sounds remain.
-
-Filtering is based on sound IDs, so special effects reusing those IDs may also be muted. Music, enemy deaths, and explosions may still be audible; this does not necessarily mean peace mode failed.
-
 ## Safety and limitations
 
 - Only running process memory is modified; the helper does not write the game EXE or save files. The game itself may still save scores or unlocks. Score isolation is absent, and Steam achievements are not guaranteed to remain unaffected.
@@ -109,7 +101,5 @@ After building with `dotnet build`, run tests only against your own legally inst
 - `SpeedControl.cs`: basic game-speed control.
 - `*SelfTest.cs` / `RemoteModeTest.cs`: isolated-image and separate-process tests.
 - [Implementation notes for v3.2](docs/implementation-v3.2.txt): speed-control rationale and limitations, currently in Chinese.
-
-The helper has no networking, advertising, account requirement, or follow-to-unlock mechanism. No game files or assets are distributed. It remains an experimental project, not a public release.
 
 When reporting a problem, describe the game version, enabled features, and reproduction steps. Do not upload game executables, assets, saves, logs containing personal information, or account credentials.
