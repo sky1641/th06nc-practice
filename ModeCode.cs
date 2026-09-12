@@ -9,6 +9,9 @@ internal static class ModeCode
     internal const int Peace = 0, Enabled = 1, Active = 2, Latch = 3, Lease = 4, Attack = 8;
     internal const int SpeedPercent = 12, SpeedLease = 16, SpeedBase = 24, SpeedApplied = 32, SpeedCaptured = 40, SpeedEffective = 44;
     internal const int FramePeriod = 0xC22100, FrameInitialized = 0xC22120;
+    internal const int Overdrive = 48, PlayerOpacity = 52, EnemyOpacity = 56, EnemyManager = 64;
+    internal const int OverdrivePercent = 1600, Player = 0x4FF3A0;
+    internal static readonly int[] VertexColors = [0xA6EAF0, 0xA6EB0C, 0xA6EB28, 0xA6EB44, 0xA6E9D8, 0xA6EA08, 0xA6EA38, 0xA6EA68];
     internal static readonly int[] EnemyShotSounds = [7, 8, 9, 15, 16, 17, 22, 23, 24];
     internal sealed record Site(int Rva, string Hex, string Kind)
     {
@@ -26,7 +29,7 @@ internal static class ModeCode
         new(0x689DE, "0FB60D0C674900", "bomb"),
         new(0x69774, "F3440F100DDB352A00", "shots"),
         new(0x69B98, "8BAF0C04000085ED", "fire"),
-        new(0x3CC56, "803D5C5B4B0000", "time"),
+        new(0x3CC56, "803D5C5B4B0000", "guiTime"),
         new(0x77BC7, "803DEBAB470000", "time"),
         new(0x76310, "803DA2C4470000", "time"),
         new(0x3740C, "E84FEEFFFF", "timeline"),
@@ -35,7 +38,12 @@ internal static class ModeCode
         new(0x381F1, "41898C24B8C01000FFC141898C24BCC01000", "timelineTick"),
         new(0x37B86, "83BB3402000000", "bossPhase"),
         new(0x76A34, "0FB60D7CB3BA00", "sound"),
-        new(0x3C465, "44383DB45CBE00", "speed")
+        new(0x3C465, "44383DB45CBE00", "speed"),
+        new(0x31E7, "8B054FECC100", "opacity"),
+        new(0x3E24, "88053EACA600", "opacity"),
+        new(0x554C, "88051695A600", "opacity"),
+        new(0x33D0, "4584D20F8575020000", "opacityRoute"),
+        new(0x4010, "0F888C020000", "opacityRoute")
     ];
 
     internal static byte[] Build(Site site, long origin, long image, long control)
@@ -45,6 +53,21 @@ internal static class ModeCode
         void Cmp(int field, byte value = 0) => a.Rip("803D", control + field, [value]);
         void Set(int field, byte value) => a.Rip("C605", control + field, [value]);
         void Original() { a.Emit(site.Original); a.Jmp(Resume); }
+        // RBX is the current ANM VM. Only projectile-pool VMs are affected.
+        // EDX = opacity percentage; classification itself never writes game data.
+        void OpacityFactor()
+        {
+            a.Emit("BA64000000");
+            a.Rip("833D", image + Scene, [2]); a.Branch(0x85, "factorDone");
+            a.Rip("488D05", image + Player + 0x410);
+            a.Emit("488BCB482BC84881F900730000"); a.Branch(0x82, "playerFactor");
+            a.Rip("488B05", control + EnemyManager);
+            a.Emit("4885C0"); a.Branch(0x84, "factorDone");
+            a.Emit("4883C008488BCB482BC84881F930F60F00"); a.Branch(0x83, "factorDone");
+            a.Rip("8B15", control + EnemyOpacity); a.Jmp("factorDone");
+            a.Label("playerFactor"); a.Rip("8B15", control + PlayerOpacity);
+            a.Label("factorDone");
+        }
         void EffectiveTime()
         {
             Cmp(Active);
@@ -60,14 +83,18 @@ internal static class ModeCode
                 a.Emit("505152"); // Preserve RAX=current time, RDX=current time, and RCX.
                 a.Rip("833D", control + SpeedLease, [0]); a.Branch(0x8E, "speedExpired");
                 a.Rip("FF0D", control + SpeedLease);
-                a.Rip("8B0D", control + SpeedPercent); a.Jmp("speedScene");
+                a.Rip("8B0D", control + SpeedPercent);
+                Cmp(Overdrive); a.Branch(0x84, "speedScene");
+                a.Emit("B940060000"); a.Jmp("speedScene");
                 a.Label("speedExpired");
+                Set(Overdrive, 0);
                 a.Rip("C705", control + SpeedPercent, BitConverter.GetBytes(100));
                 a.Emit("B964000000");
                 a.Label("speedScene");
                 a.Rip("833D", image + Scene, [2]); a.Branch(0x84, "speedRange");
                 a.Emit("B964000000"); // Menus/loading run at original speed; choice stays armed.
                 a.Label("speedRange");
+                a.Emit("81F940060000"); a.Branch(0x84, "speedRead");
                 a.Emit("83F919"); a.Branch(0x8C, "speedDefault");
                 a.Emit("81F9C8000000"); a.Branch(0x8E, "speedRead");
                 a.Label("speedDefault"); a.Emit("B964000000");
@@ -110,6 +137,8 @@ internal static class ModeCode
                 Set(Latch, 1); a.Jmp("finish");
                 a.Label("release"); Set(Latch, 0); a.Jmp("finish");
                 a.Label("expired"); Set(Peace, 0); Set(Enabled, 0);
+                a.Rip("C705", control + PlayerOpacity, BitConverter.GetBytes(100));
+                a.Rip("C705", control + EnemyOpacity, BitConverter.GetBytes(100));
                 a.Label("reset"); Set(Active, 0);
                 a.Rip("8B05", image + Input); a.Emit("D1E883E001");
                 a.Rip("8805", control + Latch);
@@ -119,6 +148,7 @@ internal static class ModeCode
                 a.Label("done"); a.Jmp(Resume);
                 break;
             case "bullets":
+                a.Rip("48890D", control + EnemyManager);
                 // RCX is BulletManager. Clearing state retains all object storage/pointers.
                 Cmp(Peace); a.Branch(0x84, "clock");
                 a.Emit("5052");
@@ -132,6 +162,42 @@ internal static class ModeCode
                 a.Label("clock"); EffectiveTime();
                 break;
             case "time": EffectiveTime(); break;
+            case "guiTime":
+                Cmp(Active); a.Branch(0x84, "guiClock");
+                a.Emit("50524885C9"); a.Branch(0x84, "guiDone");
+                a.Emit("488B51384885D2"); a.Branch(0x84, "guiDone");
+                a.Rip("488B05", image + Player + 0x7730);
+                a.Emit("488982E801000048898208030000");
+                a.Rip("8B05", image + Player + 0x7738);
+                a.Emit("8982F0010000898210030000");
+                a.Label("guiDone"); a.Emit("5A58");
+                a.Label("guiClock"); EffectiveTime(); break;
+            case "opacity":
+                // Run after native per-vertex fades; scale alpha without touching RGB.
+                if (site.Rva == 0x31E7) a.Rip("8B05", image + 0xC21E3C);
+                else a.Rip("8805", image + 0xA6EA68);
+                a.Emit("9C5051524150");
+                OpacityFactor();
+                a.Emit("83FA64"); a.Branch(0x83, "opacityDone");
+                a.Emit("448BC2B964000000");
+                foreach (int color in VertexColors)
+                    {
+                        a.Rip("0FB605", image + color + 3);
+                        a.Emit("410FAFC033D2F7F1");
+                        a.Rip("8805", image + color + 3);
+                    }
+                a.Label("opacityDone"); a.Emit("41585A59589D"); a.Jmp(Resume); break;
+            case "opacityRoute":
+                // The optimized path reloads VM color; use the existing vertex path
+                // for faded projectiles so the final alpha is actually honored.
+                a.Emit("9C505152");
+                OpacityFactor();
+                a.Emit("83FA64"); a.Branch(0x83, "routeOriginal");
+                a.Emit("5A59589D"); a.Jmp(image + (site.Rva == 0x33D0 ? 0x364E : 0x42A2));
+                a.Label("routeOriginal"); a.Emit("5A59589D");
+                if (site.Rva == 0x33D0) { a.Emit("4584D2"); a.Rip("0F85", image + 0x364E); }
+                else a.Rip("0F88", image + 0x42A2);
+                a.Jmp(Resume); break;
             case "enemy":
                 Cmp(Active); a.Branch(0x84, "original");
                 Cmp(Attack); a.Branch(0x85, "original");

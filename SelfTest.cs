@@ -54,6 +54,7 @@ internal static class SelfTest
             ModeSelfTest.Run(image, imageSize, report);
             PracticeSelfTest.Run(image, imageSize, report);
             SpeedSelfTest.Run(image, imageSize, report);
+            VisualSelfTest.Run(image, imageSize, report);
             using (var memory = new MemorySession(image, imageSize))
             {
                 Marshal.WriteByte(image + MemorySession.LivesRva - 1, 0xA7);

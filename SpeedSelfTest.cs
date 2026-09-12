@@ -45,6 +45,18 @@ internal static class SpeedSelfTest
                     Marshal.WriteByte(image + ModeCode.FrameInitialized, 1); tick();
                     Check(Marshal.ReadByte(image + ModeCode.FrameInitialized) == 1, $"Stable speed {percent}% does not reset frame scheduling every tick");
                 }
+                m.SetSpeed(50); m.SetOverdrive(true); tick();
+                Check(Period() == 3750 && m.DesiredSpeed == 1600 && m.EffectiveSpeed == 1600, "Overdrive uses a bounded 16x whole-frame interval");
+                Marshal.WriteInt32(image + ModeCode.Scene, 3); tick();
+                Check(Period() == 60000 && m.IsOverdrive && m.EffectiveSpeed == 100, "Overdrive returns to 1x during loading without forgetting the choice");
+                Marshal.WriteInt32(image + ModeCode.Scene, 2); tick();
+                Check(Period() == 3750, "Overdrive resumes on the next stage");
+                m.SetOverdrive(false); tick();
+                Check(Period() == 120000 && m.DesiredSpeed == 50, "Disabling Overdrive restores the previous regular rate");
+                m.SetOverdrive(true); m.SetSpeed(100); tick();
+                Check(Period() == 60000 && !m.IsOverdrive, "Restore 1x exits Overdrive immediately");
+                m.SetOverdrive(true); tick(); Marshal.WriteInt32(control + ModeCode.SpeedLease, 0); tick();
+                Check(Period() == 60000 && !m.IsOverdrive, "Expired Overdrive heartbeat restores normal pacing");
                 m.SetSpeed(50); tick();
                 Marshal.WriteInt32(image + ModeCode.Scene, 3); tick();
                 Check(Period() == 60000 && m.DesiredSpeed == 50 && m.EffectiveSpeed == 100, "Loading uses 1x but retains chosen speed");
@@ -87,11 +99,12 @@ internal static class SpeedSelfTest
             using (var m = new MemorySession(image, imageSize))
             {
                 m.InstallModes();
-                foreach (int percent in new[] { 50, 75, 100, 150, 200 })
+                foreach (int percent in new[] { 50, 75, 100, 150, 200, 1600 })
                 {
                     m.RestoreSpeed(); Marshal.WriteInt64(image + ModeCode.FramePeriod, 6000);
                     Marshal.WriteByte(image + ModeCode.FrameInitialized, 0); Marshal.WriteInt64(clockValue, 0);
-                    m.SetSpeed(percent); m.HeartbeatModes(); pace();
+                    if (percent == ModeCode.OverdrivePercent) m.SetOverdrive(true); else m.SetSpeed(percent);
+                    m.HeartbeatModes(); pace();
                     long start = Marshal.ReadInt64(clockValue);
                     for (int frame = 0; frame < 6; frame++) pace();
                     long elapsed = Marshal.ReadInt64(clockValue) - start;

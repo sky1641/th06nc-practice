@@ -1,0 +1,63 @@
+name: Release v1.0.0
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/release-v1.0.0.yml
+
+concurrency:
+  group: release-v1.0.0
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Check for an existing release
+        id: existing
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release view v1.0.0 --repo '${{ github.repository }}'
+
+      - name: Check out source
+        if: steps.existing.outcome == 'failure'
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 9
+        if: steps.existing.outcome == 'failure'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Build and test packages
+        if: steps.existing.outcome == 'failure'
+        shell: pwsh
+        run: |
+          .\build-release.ps1
+
+      - name: Publish GitHub release
+        if: steps.existing.outcome == 'failure'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create v1.0.0 `
+            '.\artifacts\v1.0.0\TH06NCPractice-v1.0.0-win-x64.zip' `
+            '.\artifacts\v1.0.0\TH06NCPractice-v1.0.0-win-x64-self-contained.zip' `
+            '.\artifacts\v1.0.0\SHA256SUMS.txt' `
+            --repo '${{ github.repository }}' `
+            --target '${{ github.sha }}' `
+            --title 'TH06 New Classic Practice Helper v1.0.0' `
+            --notes-file '.\RELEASE_NOTES.md' `
+            --draft
+          if ($LASTEXITCODE -ne 0) { throw 'Release upload failed; draft retained for recovery.' }
+          gh release edit v1.0.0 --repo '${{ github.repository }}' --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed.' }

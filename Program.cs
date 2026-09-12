@@ -10,6 +10,11 @@ internal static class Program
     private static void Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
+        if (args.Length > 0 && args[0] == "--write-icon") { PracticeIcon.Write(args[1]); return; }
+        if (args.Length > 0 && args[0] == "--ui-self-test")
+        {
+            UiPaintSelfTest.Run(args[1]); return;
+        }
         if (args.Length > 0 && args[0] == "--native-host")
         {
             RemoteModeTest.Host(args[1]);
@@ -20,9 +25,11 @@ internal static class Program
             SelfTest.Run(args[1], args[2]);
             return;
         }
-        if (args.Length > 0 && args[0] == "--preview")
+        if (args.Length > 0 && args[0] is "--preview" or "--preview-active" or "--preview-wide")
         {
             using var form = new TrainerForm(false);
+            if (args[0] == "--preview-active") form.PreparePreview();
+            if (args[0] == "--preview-wide") form.Width = 1000;
             form.Show();
             Application.DoEvents();
             using var bitmap = new Bitmap(form.Width, form.Height);
@@ -33,7 +40,7 @@ internal static class Program
         using var mutex = new Mutex(true, @"Local\TH06NCTrainerV2", out bool created);
         if (!created)
         {
-            MessageBox.Show("新版修改器已经运行，请切换到已有窗口。", "新典修改器");
+            MessageBox.Show("练习辅助已在运行，请切换到已有窗口。", "TH06 New Classic");
             return;
         }
         Application.Run(new TrainerForm());
@@ -47,21 +54,26 @@ internal sealed class Preferences
     public int Power { get; set; } = 128;
 }
 
-internal sealed class TrainerForm : Form
+internal sealed class TrainerForm : MoonForm
 {
     private readonly Label connection = new() { AutoSize = false };
     private readonly Label feedback = new() { AutoSize = false };
-    private readonly Label godStatus = new() { AutoSize = true, Text = "已关闭", ForeColor = Color.DimGray };
-    private readonly CheckBox god = new() { AutoSize = true, Text = "无敌  [F8]" };
-    private readonly CheckBox peace = new() { AutoSize = true, Text = "和平观光  [F9]", Enabled = false };
-    private readonly CheckBox sakuya = new() { AutoSize = true, Text = "不可攻击  [F11]", Enabled = false };
-    private readonly CheckBox sakuyaAttack = new() { AutoSize = true, Text = "可攻击  [F10]", Enabled = false };
-    private readonly Label peaceStatus = new() { AutoSize = true, Text = "已关闭", ForeColor = Color.DimGray };
-    private readonly Label timeStatus = new() { AutoSize = true, Text = "已关闭", ForeColor = Color.DimGray };
-    private readonly Button resume = new() { Text = "立即恢复时间", Enabled = false };
+    private readonly Label godStatus = new() { AutoSize = true, Text = "已关闭", ForeColor = Theme.Muted };
+    private readonly CheckBox god = new ThemedCheckBox() { AutoSize = true, Text = "无敌  [F8]" };
+    private readonly CheckBox peace = new ThemedCheckBox() { AutoSize = true, Text = "和平观光  [F9]", Enabled = false };
+    private readonly CheckBox sakuya = new ThemedCheckBox() { AutoSize = true, Text = "不可攻击  [F11]", Enabled = false };
+    private readonly CheckBox sakuyaAttack = new ThemedCheckBox() { AutoSize = true, Text = "可攻击  [F10]", Enabled = false };
+    private readonly Label peaceStatus = new() { AutoSize = true, Text = "已关闭", ForeColor = Theme.Muted };
+    private readonly Label timeStatus = new() { AutoSize = true, Text = "已关闭", ForeColor = Theme.Muted };
+    private readonly Button resume = new ThemedButton() { Text = "立即恢复时间", Enabled = false };
     private readonly NumericUpDown speedTarget = new() { Minimum = 25, Maximum = 200, Increment = 5, Value = 100, Width = 70 };
-    private readonly Label speedStatus = new() { Text = "正常速度 1.00×", AutoSize = true, ForeColor = Color.DimGray };
+    private readonly Label speedStatus = new() { Text = "正常速度 1.00×", AutoSize = true, ForeColor = Theme.Muted };
     private readonly List<Button> speedButtons = [];
+    private readonly CheckBox overdrive = new ThemedCheckBox() { Text = "Overdrive · 娱乐", AutoSize = true, Enabled = false };
+    private readonly NumericUpDown playerOpacity = new() { Minimum = 0, Maximum = 100, Value = 100, Width = 65 };
+    private readonly NumericUpDown enemyOpacity = new() { Minimum = 0, Maximum = 100, Value = 100, Width = 65 };
+    private readonly Button applyOpacity = new ThemedButton() { Text = "应用", Enabled = false };
+    private readonly Button resetOpacity = new ThemedButton() { Text = "恢复", Enabled = false };
     private readonly List<ResourceRow> rows = [];
     private readonly System.Windows.Forms.Timer timer = new() { Interval = 50 };
     private MemorySession? session;
@@ -74,73 +86,94 @@ internal sealed class TrainerForm : Form
     public TrainerForm(bool live = true)
     {
         this.live = live;
-        Text = "东方红魔乡：新典 · 练习辅助 v3.2";
+        Text = "东方红魔乡：新典 · 练习辅助 v1.0.0";
         Font = new Font("Microsoft YaHei UI", 10F);
         BackColor = Color.FromArgb(247, 249, 252);
-        ClientSize = new Size(700, 812);
-        MinimumSize = new Size(716, 650);
+        ClientSize = new Size(700, Math.Min(880, Math.Max(540, Screen.PrimaryScreen!.WorkingArea.Height - 100)));
+        MinimumSize = new Size(716, 560);
         AutoScroll = true;
-        AutoScrollMinSize = new Size(700, 812);
+        AutoScrollMinSize = new Size(700, 880);
         StartPosition = FormStartPosition.CenterScreen;
         AutoScaleMode = AutoScaleMode.Dpi;
-        var title = new Label { Text = "TH06 New Classic", AutoSize = true, Font = new Font(Font.FontFamily, 21F, FontStyle.Bold), Location = new Point(24, 17) };
-        var subtitle = new Label { Text = "新典练习辅助  /  资源设置 · 变速 · 观光与时停", AutoSize = true, ForeColor = Color.DimGray, Location = new Point(26, 58) };
-        var reconnect = new Button { Text = "重新连接", Bounds = new Rectangle(554, 25, 120, 35), Anchor = AnchorStyles.Top | AnchorStyles.Right };
+        var title = new Label { Text = "NEW CLASSIC", AutoSize = true, Font = new Font("Segoe UI", 23F, FontStyle.Bold), Location = new Point(74, 15) };
+        var subtitle = new Label { Text = "新典练习辅助   /   PRACTICE && SIGHTSEEING", AutoSize = true, ForeColor = Theme.Muted, Location = new Point(26, 62) };
+        var reconnect = new ThemedButton { Text = "重新连接", Bounds = new Rectangle(554, 25, 120, 35), Anchor = AnchorStyles.Top | AnchorStyles.Right };
         reconnect.Click += (_, _) => Reconnect();
-        connection.Bounds = new Rectangle(26, 92, 648, 40);
+        connection.Bounds = new Rectangle(26, 92, 648, 26);
         connection.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         connection.Text = "等待游戏启动…";
-        var table = new TableLayoutPanel { Bounds = new Rectangle(24, 143, 652, 145), ColumnCount = 4, RowCount = 4, BackColor = Color.White, Padding = new Padding(12), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+        var table = new TableLayoutPanel { Bounds = new Rectangle(24, 124, 652, 145), ColumnCount = 4, RowCount = 4, BackColor = Color.Transparent, Padding = new Padding(12), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 22));
         foreach (string heading in new[] { "功能 / 快捷键", "当前值", "锁定目标", "操作" })
-            table.Controls.Add(new Label { Text = heading, AutoSize = true, ForeColor = Color.DimGray });
+            table.Controls.Add(new Label { Text = heading, AutoSize = true, ForeColor = Theme.Muted });
         var prefs = LoadPreferences();
         AddRow(Resource.Lives, "锁残机  [F5]", prefs.Lives, table);
         AddRow(Resource.Bombs, "锁 Bomb  [F6]", prefs.Bombs, table);
         AddRow(Resource.Power, "锁 POWER  [F7]", prefs.Power, table);
-        var speedBox = new Panel { Bounds = new Rectangle(24, 300, 652, 88), BackColor = Color.White, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+        var speedBox = new GlassPanel { Bounds = new Rectangle(24, 281, 652, 121), BackColor = Color.Transparent, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
         speedTarget.Location = new Point(92, 9);
         speedStatus.Location = new Point(258, 13);
-        var applySpeed = new Button { Text = "应用", Bounds = new Rectangle(183, 8, 63, 29), Enabled = false };
+        var applySpeed = new ThemedButton { Text = "应用", Bounds = new Rectangle(183, 8, 63, 29), Enabled = false };
         applySpeed.Click += (_, _) => RunAction(() => ApplySpeed((int)speedTarget.Value));
         speedButtons.Add(applySpeed);
         speedBox.Controls.AddRange([new Label { Text = "游戏速度", AutoSize = true, Location = new Point(12, 13) }, speedTarget, new Label { Text = "%", AutoSize = true, Location = new Point(162, 13) }, applySpeed, speedStatus]);
         int speedX = 12;
         foreach (int percent in new[] { 50, 75, 100, 150, 200 })
         {
-            var preset = new Button { Text = percent == 100 ? "恢复 1×" : $"{percent / 100.0:0.##}×", Bounds = new Rectangle(speedX, 47, 82, 28), Enabled = false };
+            var preset = new ThemedButton { Text = percent == 100 ? "恢复 1×" : $"{percent / 100.0:0.##}×", Bounds = new Rectangle(speedX, 47, 82, 28), Enabled = false };
             preset.Click += (_, _) => RunAction(() => { speedTarget.Value = percent; ApplySpeed(percent); });
             speedButtons.Add(preset); speedBox.Controls.Add(preset); speedX += 88;
         }
-        speedBox.Controls.Add(new Label { Text = "音乐原速；跨面保留\n加速受性能/垂直同步限制", Bounds = new Rectangle(454, 45, 190, 39), ForeColor = Color.DimGray, Font = new Font(Font.FontFamily, 8.5F) });
-        var godBox = new Panel { Bounds = new Rectangle(24, 400, 652, 67), BackColor = Color.White, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+        overdrive.Location = new Point(456, 51);
+        overdrive.CheckedChanged += (_, _) =>
+        {
+            if (updating) return;
+            RunAction(() =>
+            {
+                session?.SetOverdrive(overdrive.Checked); RefreshSpeed();
+                feedback.Text = overdrive.Checked ? "Overdrive：目标 16×（约 960 FPS），实际速度取决于性能与显示设置。" : "已恢复所选常规倍率。";
+            });
+        };
+        speedBox.Controls.Add(overdrive);
+        speedBox.Controls.Add(new Label { Text = "加速前关闭 V-Sync（垂直同步）· 音乐原速", Bounds = new Rectangle(12, 87, 430, 27), ForeColor = Theme.Muted, Font = new Font(Font.FontFamily, 9F) });
+        speedBox.Controls.Add(new Label { Text = "还原千帧乡（笑）", Bounds = new Rectangle(456, 87, 190, 27), ForeColor = Theme.Muted, Font = new Font(Font.FontFamily, 9F) });
+        var opacityBox = new GlassPanel { Bounds = new Rectangle(24, 414, 652, 84), BackColor = Color.Transparent, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+        playerOpacity.Location = new Point(148, 11); enemyOpacity.Location = new Point(332, 11);
+        applyOpacity.Bounds = new Rectangle(436, 9, 78, 30); resetOpacity.Bounds = new Rectangle(526, 9, 78, 30);
+        applyOpacity.Click += (_, _) => RunAction(() => ApplyOpacity());
+        resetOpacity.Click += (_, _) => RunAction(() => { playerOpacity.Value = enemyOpacity.Value = 100; ApplyOpacity(); });
+        opacityBox.Controls.AddRange([new Label { Text = "弹幕透明度", AutoSize = true, Location = new Point(12, 15) }, new Label { Text = "自机", AutoSize = true, Location = new Point(105, 15) }, playerOpacity, new Label { Text = "%", AutoSize = true, Location = new Point(215, 15) }, new Label { Text = "敌机", AutoSize = true, Location = new Point(289, 15) }, enemyOpacity, new Label { Text = "%", AutoSize = true, Location = new Point(399, 15) }, applyOpacity, resetOpacity, new Label { Text = "0% 隐藏 · 100% 原始显示；子弹与激光的碰撞判定不变。", Bounds = new Rectangle(12, 49, 628, 27), ForeColor = Theme.Muted, Font = new Font(Font.FontFamily, 9F) }]);
+        var godBox = new GlassPanel { Bounds = new Rectangle(24, 510, 652, 60), BackColor = Color.Transparent, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
         god.Location = new Point(12, 12);
         god.Enabled = false;
         godStatus.Location = new Point(250, 12);
-        godBox.Controls.AddRange([god, godStatus, new Label { Text = "覆盖普通弹、敌机接触及激光；关闭或正常退出时恢复。", AutoSize = true, Location = new Point(12, 39), ForeColor = Color.DimGray, Font = new Font(Font.FontFamily, 9F) }]);
+        godBox.Controls.AddRange([god, godStatus, new Label { Text = "免疫普通弹、敌机接触与激光伤害。", AutoSize = true, Location = new Point(12, 35), ForeColor = Theme.Muted, Font = new Font(Font.FontFamily, 9F) }]);
         god.CheckedChanged += (_, _) => ToggleGod();
-        var peaceBox = new Panel { Bounds = new Rectangle(24, 478, 652, 70), BackColor = Color.White, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+        var peaceBox = new GlassPanel { Bounds = new Rectangle(24, 582, 652, 60), BackColor = Color.Transparent, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
         peace.Location = new Point(12, 10);
         peaceStatus.Location = new Point(250, 10);
-        peaceBox.Controls.AddRange([peace, peaceStatus, new Label { Text = "清除并禁止敌弹与激光，过滤发弹音效；保留音乐，免接触伤害。", AutoSize = true, Location = new Point(12, 40), ForeColor = Color.DimGray, Font = new Font(Font.FontFamily, 9F) }]);
-        var timeBox = new Panel { Bounds = new Rectangle(24, 560, 652, 148), BackColor = Color.White, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+        peaceBox.Controls.AddRange([peace, peaceStatus, new Label { Text = "清除并禁止敌弹与激光，静音发弹音效，免接触伤害。", AutoSize = true, Location = new Point(12, 35), ForeColor = Theme.Muted, Font = new Font(Font.FontFamily, 9F) }]);
+        var timeBox = new GlassPanel { Bounds = new Rectangle(24, 654, 652, 140), BackColor = Color.Transparent, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
         sakuyaAttack.Location = new Point(12, 44);
         sakuya.Location = new Point(216, 44);
         timeStatus.Location = new Point(132, 12);
         resume.Bounds = new Rectangle(504, 9, 133, 30);
         resume.Click += (_, _) => RunAction(() => { session?.ResumeTime(); RefreshModes(); });
-        timeBox.Controls.AddRange([new Label { Text = "咲夜模式", AutoSize = true, Location = new Point(12, 12) }, sakuyaAttack, sakuya, timeStatus, resume, new Label { Text = "先选模式，再用游戏放雷键切换时停；不消耗 Bomb，可自由移动。\n可攻击：射击并结算伤害；不可攻击：自机射击也暂停。\n跨面保留模式但恢复时间；Boss 换阶段时自动恢复，避免卡关。", Bounds = new Rectangle(12, 78, 628, 64), ForeColor = Color.DimGray, Font = new Font(Font.FontFamily, 9F) }]);
+        timeBox.Controls.AddRange([new Label { Text = "咲夜模式", AutoSize = true, Location = new Point(12, 12) }, sakuyaAttack, sakuya, timeStatus, resume, new Label { Text = "选择模式后，用游戏放雷键切换时停；不消耗 Bomb，可自由移动。\n不可攻击模式下，自机射击也暂停。\n跨面保留模式；过面、对话及 Boss 换阶段时恢复时间。", Bounds = new Rectangle(12, 75, 628, 62), ForeColor = Theme.Muted, Font = new Font(Font.FontFamily, 9F) }]);
         peace.CheckedChanged += (_, _) => ToggleMode(0);
         sakuya.CheckedChanged += (_, _) => ToggleMode(1);
         sakuyaAttack.CheckedChanged += (_, _) => ToggleMode(2);
-        feedback.Bounds = new Rectangle(26, 721, 648, 55);
-        feedback.Text = "先进入一局，再开启需要的功能。POWER 满值为 128。";
-        feedback.ForeColor = Color.DimGray;
-        var note = new Label { Text = "不限制得分；辅助成绩不用于正常通关比较。录像可能失同步。F12 留给 Steam 截图。", Bounds = new Rectangle(26, 782, 648, 25), ForeColor = Color.DimGray, Font = new Font(Font.FontFamily, 9F), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
-        Controls.AddRange([title, subtitle, reconnect, connection, table, speedBox, godBox, peaceBox, timeBox, feedback, note]);
+        feedback.Bounds = new Rectangle(26, 806, 648, 43);
+        feedback.Text = "进入一局后，按需启用功能。";
+        feedback.ForeColor = Theme.Muted;
+        var note = new Label { Text = "辅助游玩的录像可能失同步，成绩请与正常挑战区分。", Bounds = new Rectangle(26, 852, 648, 25), ForeColor = Theme.Muted, Font = new Font(Font.FontFamily, 9F), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+        Controls.AddRange([title, subtitle, reconnect, connection, table, speedBox, opacityBox, godBox, peaceBox, timeBox, feedback, note]);
+        if (Icon is not null)
+            Controls.Add(new PictureBox { Image = Icon.ToBitmap(), SizeMode = PictureBoxSizeMode.Zoom, Bounds = new Rectangle(27, 27, 36, 36), BackColor = Color.Transparent });
+        Theme.Apply(this);
         FormClosing += OnClosing;
         FormClosed += (_, _) =>
         {
@@ -183,6 +216,21 @@ internal sealed class TrainerForm : Form
         };
     }
 
+    internal void PreparePreview()
+    {
+        if (live) throw new InvalidOperationException("Preview only");
+        SetConnected(true);
+        updating = true;
+        try
+        {
+            connection.Text = "已连接游戏 · 界面预览"; connection.ForeColor = Theme.Success;
+            rows[0].Current.Text = "3"; rows[1].Current.Text = "2"; rows[2].Current.Text = "128";
+            rows[2].Lock.Checked = true;
+            sakuyaAttack.Checked = true; timeStatus.Text = "已就绪 · 放雷键切换"; timeStatus.ForeColor = Theme.Success;
+        }
+        finally { updating = false; }
+    }
+
     private Preferences LoadPreferences()
     {
         try { return JsonSerializer.Deserialize<Preferences>(File.ReadAllText(prefsPath)) ?? new(); }
@@ -215,8 +263,8 @@ internal sealed class TrainerForm : Form
         {
             if (session is null) throw new InvalidOperationException("请先启动并连接游戏");
             session.SetInvincible(god.Checked);
-            godStatus.Text = god.Checked ? "已开启 · 中弹不进入死亡状态" : "已关闭 · 原始判定已恢复";
-            godStatus.ForeColor = god.Checked ? Color.DarkGreen : Color.DimGray;
+            godStatus.Text = god.Checked ? "已开启" : "已关闭";
+            godStatus.ForeColor = god.Checked ? Theme.Success : Theme.Muted;
         });
     }
 
@@ -224,15 +272,26 @@ internal sealed class TrainerForm : Form
     {
         if (session is null) throw new InvalidOperationException("请先连接游戏");
         session.SetSpeed(percent); RefreshSpeed();
-        feedback.Text = percent == 100 ? "已恢复正常速度；其他辅助开关保持不变。" : $"目标速度 {percent / 100.0:0.00}×。变速只改变游戏节奏，不调整音乐、不限制得分。";
-        feedback.ForeColor = Color.DimGray;
+        feedback.Text = percent == 100 ? "已恢复正常速度。" : $"目标速度 {percent / 100.0:0.00}×。";
+        feedback.ForeColor = Theme.Muted;
     }
 
     private void RefreshSpeed()
     {
-        int desired = session?.DesiredSpeed ?? 100, effective = session?.EffectiveSpeed ?? 100;
-        speedStatus.Text = desired == 100 ? "正常速度 1.00×" : effective == desired ? $"已应用 {desired / 100.0:0.00}×" : $"目标 {desired / 100.0:0.00}× · 等待游戏帧";
-        speedStatus.ForeColor = desired == 100 ? Color.DimGray : Color.DarkGreen;
+        updating = true;
+        try { overdrive.Checked = session?.IsOverdrive ?? false; }
+        finally { updating = false; }
+        int desired = session?.DesiredSpeed ?? 100;
+        speedStatus.Text = desired == 100 ? "正常速度 1.00×" : desired == ModeCode.OverdrivePercent ? "Overdrive · 目标 16×" : $"目标 {desired / 100.0:0.00}×";
+        speedStatus.ForeColor = desired == 100 ? Theme.Muted : Theme.Success;
+    }
+
+    private void ApplyOpacity()
+    {
+        if (session is null) throw new InvalidOperationException("请先连接游戏");
+        session.SetOpacity((int)playerOpacity.Value, (int)enemyOpacity.Value);
+        feedback.Text = $"弹幕透明度：自机 {playerOpacity.Value}% · 敌机 {enemyOpacity.Value}%。";
+        feedback.ForeColor = Theme.Muted;
     }
 
     private void ToggleMode(int mode)
@@ -245,7 +304,7 @@ internal sealed class TrainerForm : Form
             else session.SetSakuya(mode == 2 ? sakuyaAttack.Checked : sakuya.Checked, mode == 2);
             RefreshModes();
             feedback.Text = mode != 0 && session.ModeState.Enabled ? "咲夜模式已就绪：使用游戏放雷键切换时停。" : "玩法开关已更新。";
-            feedback.ForeColor = Color.DimGray;
+            feedback.ForeColor = Theme.Muted;
         });
     }
 
@@ -256,10 +315,10 @@ internal sealed class TrainerForm : Form
         bool attack = session?.AttackAllowed ?? false;
         try { peace.Checked = state.Peace; sakuya.Checked = state.Enabled && !attack; sakuyaAttack.Checked = state.Enabled && attack; }
         finally { updating = false; }
-        peaceStatus.Text = state.Peace ? "已开启 · 禁弹与接触保护" : "已关闭";
-        peaceStatus.ForeColor = state.Peace ? Color.DarkGreen : Color.DimGray;
+        peaceStatus.Text = state.Peace ? "已开启" : "已关闭";
+        peaceStatus.ForeColor = state.Peace ? Theme.Success : Theme.Muted;
         timeStatus.Text = state.Active ? (attack ? "时停中 · 可攻击" : "时停中 · 不可攻击") : state.Enabled ? "已就绪 · 放雷键切换" : "已关闭";
-        timeStatus.ForeColor = state.Active ? Color.MediumSlateBlue : state.Enabled ? Color.DarkGreen : Color.DimGray;
+        timeStatus.ForeColor = state.Active ? Theme.Accent : state.Enabled ? Theme.Success : Theme.Muted;
         resume.Enabled = state.Active;
     }
 
@@ -273,7 +332,7 @@ internal sealed class TrainerForm : Form
                 session = null;
                 SetConnected(false);
                 connection.Text = "游戏已退出，等待重新启动…";
-                connection.ForeColor = Color.DimGray;
+                connection.ForeColor = Theme.Muted;
             }
             if (session is null)
             {
@@ -315,14 +374,14 @@ internal sealed class TrainerForm : Form
                 throw new InvalidOperationException("请先关闭旧版或其他修改器窗口。");
             session = new MemorySession(games[0]);
             SetConnected(true);
-            connection.Text = $"已连接 · PID {session.Pid} · 游戏版本校验通过";
-            connection.ForeColor = Color.DarkGreen;
+            connection.Text = "已连接游戏";
+            connection.ForeColor = Theme.Success;
             RefreshValues();
         }
         catch (Exception ex)
         {
             connection.Text = ex.Message;
-            connection.ForeColor = Color.Firebrick;
+            connection.ForeColor = Theme.Error;
         }
         finally { foreach (var game in games) game.Dispose(); }
     }
@@ -340,16 +399,19 @@ internal sealed class TrainerForm : Form
                 row.Current.Text = "—";
             }
             god.Checked = false;
+            overdrive.Checked = false;
+            overdrive.Enabled = applyOpacity.Enabled = resetOpacity.Enabled = connected;
+            playerOpacity.Value = enemyOpacity.Value = 100;
             foreach (var button in speedButtons) button.Enabled = connected;
             speedStatus.Text = "正常速度 1.00×";
-            speedStatus.ForeColor = Color.DimGray;
+            speedStatus.ForeColor = Theme.Muted;
             god.Enabled = connected;
             godStatus.Text = "已关闭";
-            godStatus.ForeColor = Color.DimGray;
+            godStatus.ForeColor = Theme.Muted;
             peace.Checked = sakuya.Checked = sakuyaAttack.Checked = false;
             peace.Enabled = sakuya.Enabled = sakuyaAttack.Enabled = connected;
             peaceStatus.Text = timeStatus.Text = "已关闭";
-            peaceStatus.ForeColor = timeStatus.ForeColor = Color.DimGray;
+            peaceStatus.ForeColor = timeStatus.ForeColor = Theme.Muted;
             resume.Enabled = false;
         }
         finally { updating = false; }
@@ -358,18 +420,25 @@ internal sealed class TrainerForm : Form
     private void DisableAll()
     {
         foreach (var row in rows) row.Lock.Checked = false;
+        if (session is not null && !session.IsAlive)
+        {
+            session.Dispose(); session = null;
+            SetConnected(false);
+            return;
+        }
         session?.DisableModes();
         session?.RestoreSpeed();
         session?.RestoreInvincible();
+        session?.SetOpacity(100, 100);
         updating = true;
         god.Checked = false;
         peace.Checked = sakuya.Checked = sakuyaAttack.Checked = false;
         updating = false;
         godStatus.Text = "已关闭";
-        godStatus.ForeColor = Color.DimGray;
+        godStatus.ForeColor = Theme.Muted;
         RefreshModes();
         RefreshSpeed();
-        feedback.Text = "全部功能已关闭，时间与原始中弹判定已恢复。";
+        feedback.Text = "已恢复游戏设置。";
     }
 
     private void Reconnect() => RunAction(() =>
@@ -379,9 +448,9 @@ internal sealed class TrainerForm : Form
         session = null;
         SetConnected(false);
         connection.Text = "等待游戏启动…";
-        connection.ForeColor = Color.DimGray;
+        connection.ForeColor = Theme.Muted;
         TryAttach();
-        feedback.ForeColor = Color.DimGray;
+        feedback.ForeColor = Theme.Muted;
         if (live) timer.Start();
     });
 
@@ -393,15 +462,16 @@ internal sealed class TrainerForm : Form
 
     private void Fail(Exception ex)
     {
+        LogFailure(ex);
         timer.Stop();
         foreach (var row in rows) row.Lock.Checked = false;
         string message = ex.Message;
         try { DisableAll(); }
         catch (Exception restore) { message += "；恢复失败：" + restore.Message + "。请关闭游戏以清除内存修改。"; }
         feedback.Text = message;
-        feedback.ForeColor = Color.Firebrick;
+        feedback.ForeColor = Theme.Error;
         connection.Text = "操作已停止；处理后可点击重新连接。";
-        connection.ForeColor = Color.Firebrick;
+        connection.ForeColor = Theme.Error;
     }
 
     private void OnClosing(object? sender, FormClosingEventArgs e)
@@ -409,7 +479,7 @@ internal sealed class TrainerForm : Form
         timer.Stop();
         try
         {
-            DisableAll();
+            // Dispose owns recovery; no UI reads of a terminating process here.
             session?.Dispose();
             session = null;
             SavePreferences();
@@ -417,8 +487,18 @@ internal sealed class TrainerForm : Form
         catch (Exception ex)
         {
             e.Cancel = true;
-            MessageBox.Show("尚未成功恢复游戏指令：" + ex.Message + "\n请先关闭游戏，再退出修改器。", "恢复失败");
+            LogFailure(ex);
+            if (!live) throw;
+            MessageBox.Show("尚未成功恢复游戏状态：" + ex.GetBaseException().Message + "\n可以稍后重试；游戏结束后本窗口可以正常关闭。", "恢复失败");
+            timer.Start();
         }
+    }
+
+    private void LogFailure(Exception error)
+    {
+        if (!live) return;
+        try { File.AppendAllText(Path.Combine(AppContext.BaseDirectory, "error.log"), $"{DateTimeOffset.Now:O}\n{error}\n\n"); }
+        catch { /* Diagnostics must never block cleanup. */ }
     }
 
     protected override void WndProc(ref Message message)
@@ -448,11 +528,11 @@ internal sealed class ResourceRow
     public CheckBox Lock { get; }
     public Label Current { get; } = new() { Text = "—", AutoSize = true, Margin = new Padding(3, 5, 3, 3) };
     public NumericUpDown Target { get; }
-    public Button Apply { get; } = new() { Text = "设置一次", Enabled = false, Size = new Size(108, 29), Margin = new Padding(3, 0, 3, 0) };
+    public Button Apply { get; } = new ThemedButton() { Text = "设置一次", Enabled = false, Size = new Size(108, 29), Margin = new Padding(3, 0, 3, 0) };
     public ResourceRow(Resource kind, string title, int value)
     {
         Kind = kind;
-        Lock = new CheckBox { Text = title, AutoSize = true, Enabled = false, Margin = new Padding(3, 5, 3, 3) };
+        Lock = new ThemedCheckBox { Text = title, AutoSize = true, Enabled = false, Margin = new Padding(3, 5, 3, 3) };
         Target = new NumericUpDown { Minimum = 0, Maximum = MemorySession.Spec(kind).Maximum, Value = value, Width = 85 };
     }
 }

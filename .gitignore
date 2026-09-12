@@ -9,6 +9,9 @@ artifacts/
 
 # Personal settings, credentials, local test output
 settings.json
+assets/*
+!assets/background.png
+!assets/README.md
 .env
 .env.*
 *.log

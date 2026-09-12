@@ -119,6 +119,22 @@ internal static class RemoteModeTest
                 Check(BitConverter.ToInt64(m.Read(ModeCode.FramePeriod, 8)) == 60000, "Cross-process Dispose restores native frame period while host keeps running");
             }
             Check(!child.HasExited, "Isolated native host is still running after cross-process patch tests");
+            using (var ended = new MemorySession(child.Id, image, size))
+            {
+                ended.SetPeace(true); ended.SetSakuya(true); ended.SetOverdrive(true);
+                ended.SetOpacity(30, 60); ended.SetInvincible(true);
+                child.StandardInput.WriteLine("quit"); child.StandardInput.Flush();
+                Check(child.WaitForExit(5000), "Test game exits first while all feature families are installed");
+                Check(!ended.IsAlive && ended.ModeState == (false, false, false) && !ended.AttackAllowed && !ended.IsOverdrive && ended.DesiredSpeed == 100 && ended.EffectiveSpeed == 100, "After game exit, status getters never read released process memory");
+                using var form = new TrainerForm(false);
+                var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+                typeof(TrainerForm).GetField("session", flags)!.SetValue(form, ended);
+                var closing = new FormClosingEventArgs(CloseReason.UserClosing, false);
+                typeof(TrainerForm).GetMethod("OnClosing", flags | System.Reflection.BindingFlags.DeclaredOnly)!.Invoke(form, [form, closing]);
+                Check(!closing.Cancel && !ended.ModesInstalled && !ended.OwnsPatch, "Actual form shutdown succeeds after game exit with patches still recorded");
+                ended.Dispose();
+                Check(true, "Repeated cleanup after process exit is idempotent");
+            }
         }
         finally
         {

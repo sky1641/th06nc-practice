@@ -198,8 +198,13 @@ internal sealed partial class MemorySession : IDisposable
     public void Dispose()
     {
         if (disposed) return;
-        RemoveModes();
-        RestoreInvincible();
+        var errors = new List<Exception>();
+        try { RemoveModes(); } catch (Exception ex) { errors.Add(ex); }
+        try { RestoreInvincible(); } catch (Exception ex) { errors.Add(ex); }
+        // A process may exit between any two native calls. There is nothing to restore
+        // after its handle is signaled; never turn that race into an unclosable UI.
+        if (errors.Count > 0 && IsAlive) throw new AggregateException("恢复游戏状态失败", errors);
+        modeBlock = 0; modePatches.Clear(); owned.Clear();
         handle.Dispose();
         disposed = true;
     }

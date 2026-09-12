@@ -15,5 +15,12 @@ if ($LASTEXITCODE -ne 0) {
 
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README.md') -Destination $outputDir
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README.zh-CN.md') -Destination $outputDir
+$docsDir = Join-Path $outputDir 'docs'
+New-Item -ItemType Directory -Path $docsDir -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'docs\implementation-v3.3.md') -Destination $docsDir
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'docs\implementation-v3.4.md') -Destination $docsDir
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'docs\implementation-v3.4.1.md') -Destination $docsDir
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'docs\implementation-v3.4.2.md') -Destination $docsDir
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'docs\implementation-v3.4.3.md') -Destination $docsDir
 Write-Host "Built application: $outputDir\TH06NCTrainer.exe"
 Write-Host 'Keep all files in this output directory together. Requires .NET 9 Desktop Runtime x64.'

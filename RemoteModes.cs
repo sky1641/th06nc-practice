@@ -24,13 +24,13 @@ internal sealed partial class MemorySession
     {
         get
         {
-            if (!ModesInstalled) return (false, false, false);
+            if (!ModesInstalled || !IsAlive) return (false, false, false);
             var state = ReadRemote(Control, 3);
             return (state[0] != 0, state[1] != 0, state[2] != 0);
         }
     }
     public bool InGame => BitConverter.ToInt32(Read(ModeCode.Scene, 4)) == 2;
-    public bool AttackAllowed => ModesInstalled && ReadRemote(Control + ModeCode.Attack, 1)[0] != 0;
+    public bool AttackAllowed => ModesInstalled && IsAlive && ReadRemote(Control + ModeCode.Attack, 1)[0] != 0;
 
     public void MaintainModes()
     {
@@ -74,14 +74,15 @@ internal sealed partial class MemorySession
     }
     private void RequireGame()
     {
-        if (!InGame) throw new InvalidOperationException("请先进入一局，再开启和平观光或咲夜模式。");
+        if (!InGame) throw new InvalidOperationException("请先进入一局，再启用此功能。");
     }
     public void HeartbeatModes()
     {
         if (ModesInstalled)
         {
-            WriteRemote(Control + ModeCode.Lease, BitConverter.GetBytes(120));
-            WriteRemote(Control + ModeCode.SpeedLease, BitConverter.GetBytes(120));
+            int frames = IsOverdrive ? 1920 : 120;
+            WriteRemote(Control + ModeCode.Lease, BitConverter.GetBytes(frames));
+            WriteRemote(Control + ModeCode.SpeedLease, BitConverter.GetBytes(frames));
         }
     }
     public void VerifyModes()
@@ -96,7 +97,7 @@ internal sealed partial class MemorySession
         if (ModesInstalled) { VerifyModes(); return; }
         foreach (var site in ModeCode.Sites)
             if (!Read(site.Rva, site.Original.Length).SequenceEqual(site.Original))
-                throw new InvalidOperationException($"玩法指令校验失败（{site.Rva:X}），没有启用新功能。");
+                throw new InvalidOperationException($"指令校验失败（{site.Rva:X}），未启用功能。");
         // Allocate close enough for rel32 jumps and RIP-relative accesses.
         long first = (moduleBase + moduleSize + 0xFFFF) & ~0xFFFFL;
         for (long address = first; address < moduleBase + 0x60000000; address += 0x10000)
@@ -107,6 +108,8 @@ internal sealed partial class MemorySession
         if (!ModesInstalled) throw new InvalidOperationException("无法分配玩法模块内存，没有修改游戏指令。");
         try
         {
+            WriteRemote(Control + ModeCode.PlayerOpacity, BitConverter.GetBytes(100));
+            WriteRemote(Control + ModeCode.EnemyOpacity, BitConverter.GetBytes(100));
             for (int index = 0; index < ModeCode.Sites.Length; index++)
             {
                 var site = ModeCode.Sites[index];
