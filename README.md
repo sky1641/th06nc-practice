@@ -6,7 +6,7 @@ An unofficial Windows x64 practice and sightseeing helper. Features start disabl
 
 [Download the current release](https://github.com/sky1641/th06nc-practice/releases/latest)
 
-Choose the self-contained ZIP if you do not have .NET 9 Desktop Runtime x64. Extract all files before launching.
+Choose the self-contained ZIP if you do not have .NET 9 Desktop Runtime x64. Extract all files before launching. You do not need to download or build the source code to use the helper.
 
 ## Interface
 
