@@ -1,0 +1,29 @@
+# Build output and local IDE state
+bin/
+obj/
+artifacts/
+.vs/
+.idea/
+*.user
+*.suo
+
+# Personal settings, credentials, local test output
+settings.json
+.env
+.env.*
+*.log
+*-stdout.txt
+*-stderr.txt
+*validation*.txt
+*self-test*.txt
+
+# Never distribute the game, recordings, or binary/backup packages here
+*.exe
+*.dll
+*.pdb
+*.zip
+*.7z
+*.dat
+*.rpy
+*.dmp
+steam_appid.txt
