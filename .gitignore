@@ -1,3 +1,4 @@
+# Files kept local and excluded from the source repository.
 # Build output and local IDE state
 bin/
 obj/
